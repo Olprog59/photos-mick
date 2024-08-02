@@ -3,3 +3,4 @@ medias/
 go.sum
 output.json
 tmp
+.idea

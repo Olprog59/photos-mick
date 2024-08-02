@@ -1,9 +1,18 @@
+{{ define "media_form" }}
 <div>
   <h4>Edit Media Information</h4>
   <form
     hx-put="/media/{{ .Id }}"
     hx-target="#media-item-{{ .Id }}"
     hx-swap="outerHTML"
+    _="on htmx:afterOnLoad
+         if event.detail.successful
+           log 'Form submitted successfully'
+           put '' into #panel-content.innerHTML 
+         else
+           log 'Form submission failed'
+           add .open to #side-panel
+           add .side-panel-open to #media-list"
   >
     <div>
       <label for="originalName">File Name:</label>
@@ -108,13 +117,24 @@
     </div>
 
     <div>
-      <button type="submit">Save</button>
+<button type="submit" 
+  hx-on:click="
+    htmx.removeClass(document.getElementById('side-panel'), 'open');
+    htmx.removeClass(document.getElementById('media-list'), 'side-panel-open');
+    "
+>Save</button>
     </div>
   </form>
 
-  <div
-    id="map"
-    data-latitude="{{ .Latitude }}"
-    data-longitude="{{ .Longitude }}"
-  ></div>
+    <!-- Votre contenu de formulaire ici -->
+    <div id="map-container">
+      <div
+        id="map"
+        data-latitude="{{ .Latitude }}"
+        data-longitude="{{ .Longitude }}"
+        style="height: 400px;
+    width: 100%;"
+      ></div>
+    </div>
 </div>
+{{ end }}

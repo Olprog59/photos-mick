@@ -29,13 +29,12 @@
     <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
   </head>
   <body hx-boost="true">
-    <h1>Media Gallery</h1>
     <main>
       <div
         id="media-list"
-        class="grid"
-        hx-get="/api/medias"
-        hx-trigger="load, mediaUpdated from:body"
+        hx-get="/api/medias?page=1"
+        hx-trigger="load, intersect once"
+        hx-swap="beforeend"
       ></div>
 
       <div
@@ -43,9 +42,15 @@
         id="only-change"
         _="on click 
             toggle .active on me 
-            then toggle .opacity-modified on .media-item 
-            if me.hasClass('active') 
-            else remove .opacity-modified from .media-item"
+            toggle .opacity-modified on .media-item 
+            if I do not match .active 
+              remove .opacity-modified from .media-item
+          end
+
+          on htmx:afterOnLoad
+            if I match .active
+              add .opacity-modified to .media-item
+          end"
       >
         Only Change
       </div>
@@ -54,7 +59,10 @@
         <div class="panel-content" id="panel-content"></div>
         <button
           id="close-panel"
-          _="on click remove .open from #side-panel then remove .side-panel-open from #media-list then remove .active from .media-item"
+          _="on click 
+              remove .open from #side-panel 
+              then remove .side-panel-open from #media-list 
+              then remove .active from .media-item"
         >
           x
         </button>

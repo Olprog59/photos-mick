@@ -1,71 +1,68 @@
-function initializeMap() {
-  var mapElement = document.getElementById("map");
-  if (mapElement) {
-    var lat = parseFloat(mapElement.getAttribute("data-latitude"));
-    var lng = parseFloat(mapElement.getAttribute("data-longitude"));
+window.initializeMap = function () {
+  var mapContainer = document.getElementById("map-container");
 
-    map = L.map("map").setView([lat, lng], 13);
-    marker = L.marker([lat, lng], { draggable: true }).addTo(map);
-
-    marker.on("dragend", function (e) {
-      const { lat, lng } = e.target.getLatLng();
-      document.getElementById("latitude").value = lat.toFixed(6);
-      document.getElementById("longitude").value = lng.toFixed(6);
-    });
-
-    map.on("click", function (e) {
-      const { lat, lng } = e.latlng;
-      marker.setLatLng([lat, lng]);
-      document.getElementById("latitude").value = lat.toFixed(6);
-      document.getElementById("longitude").value = lng.toFixed(6);
-    });
-
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution:
-        '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    }).addTo(map);
-    L.Control.geocoder().addTo(map);
-    return map;
+  // Recréez complètement l'élément de carte
+  var oldMapElement = document.getElementById("map");
+  if (oldMapElement) {
+    var lat = oldMapElement.getAttribute("data-latitude");
+    var lng = oldMapElement.getAttribute("data-longitude");
+    var newMapElement = document.createElement("div");
+    newMapElement.id = "map";
+    newMapElement.setAttribute("data-latitude", lat);
+    newMapElement.setAttribute("data-longitude", lng);
+    newMapElement.style.height = "400px";
+    newMapElement.style.width = "100%";
+    mapContainer.innerHTML = "";
+    mapContainer.appendChild(newMapElement);
   }
-}
 
-document.addEventListener("click", function (event) {
-  var panel = document.getElementById("side-panel");
-  if (!panel.contains(event.target) && !event.target.matches(".media-item")) {
-    panel.classList.remove("open");
-    document.getElementById("media-list").classList.remove("side-panel-open");
-    document.getElementById("panel-content").innerHTML = ""; // Clear the content
+  var mapElement = document.getElementById("map");
+  if (!mapElement) {
+    console.log("Map element not found");
+    return;
+  }
+
+  var lat = parseFloat(mapElement.getAttribute("data-latitude"));
+  var lng = parseFloat(mapElement.getAttribute("data-longitude"));
+
+  // if (map) {
+  //   map.remove();
+  // }
+
+  const map = L.map("map").setView([lat, lng], 13);
+  var marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+
+  marker.on("dragend", function (e) {
+    const { lat, lng } = e.target.getLatLng();
+    document.getElementById("latitude").value = lat.toFixed(6);
+    document.getElementById("longitude").value = lng.toFixed(6);
+  });
+
+  map.on("click", function (e) {
+    const { lat, lng } = e.latlng;
+    marker.setLatLng([lat, lng]);
+    document.getElementById("latitude").value = lat.toFixed(6);
+    document.getElementById("longitude").value = lng.toFixed(6);
+  });
+
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution:
+      '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  }).addTo(map);
+
+  if (L.Control.geocoder) {
+    L.Control.geocoder().addTo(map);
   }
 
   setTimeout(() => {
-    if (document.getElementById("panel-content").innerHTML == "") {
-      document
-        .querySelectorAll(".media-item.active")
-        .forEach((m) => m.classList.remove("active"));
+    if (map) {
+      map.invalidateSize();
     }
-  }, 500);
-});
-
-function updateActiveMediaItem(target) {
-  var activeElements = document.querySelectorAll(".media-item.active");
-  activeElements.forEach(function (el) {
-    el.classList.remove("active");
-  });
-  target.classList.add("active");
-
-  // Scroll to the active element
-  target.scrollIntoView({
-    behavior: "smooth",
-    block: "center",
-  });
-
-  // Load media details
-  htmx.trigger(target, "click");
-}
+  }, 100);
+};
 
 // footer error
-
 var idTimeout = 0;
 const footer = document.getElementById("error_popover");
 footer.querySelector("#popover__close").addEventListener("click", () => {
@@ -91,11 +88,6 @@ document.addEventListener("htmx:afterRequest", (evt) => {
   const popover = footer.querySelector("div#popover");
 
   const failed = evt.detail.failed;
-  console.log(evt);
-  const trigger = evt.detail.xhr.getResponseHeader("HX-Trigger");
-  if (trigger === "mediaUpdated") {
-    closePanel();
-  }
 
   if (failed) {
     popover.className = "";
@@ -115,23 +107,53 @@ document.addEventListener("htmx:afterRequest", (evt) => {
   }
 });
 
-// function closePanel() {
-//   var panel = document.getElementById("side-panel");
-//   panel.classList.remove("open");
-//   document.getElementById("media-list").classList.remove("side-panel-open");
-//   document.getElementById("panel-content").innerHTML = ""; // Clear the content
-// }
-//
-// let onlyChangeClick = false;
-//
-// document.getElementById("only-change").addEventListener("click", () => {
-//   const items = document.querySelectorAll(".media-item");
-//   items.forEach((i) => {
-//     if (!i.classList.contains("modified") && !onlyChangeClick) {
-//       i.style.opacity = 0.2;
-//     } else {
-//       i.style.opacity = 1;
-//     }
-//   });
-//   onlyChangeClick = !onlyChangeClick;
-// });
+document.addEventListener("htmx:configRequest", function (evt) {
+  evt.detail.headers["HX-Trigger"] = "mediaUpdated";
+});
+
+document.addEventListener("mediaUpdated", function () {
+  htmx.ajax("GET", "/api/medias", "#media-list");
+});
+
+document.addEventListener("DOMContentLoaded", function () {
+  let currentPage = 1;
+  const mediaList = document.getElementById("media-list");
+
+  // Fonction pour mettre à jour l'URL de chargement
+  function updateLoadUrl() {
+    currentPage++;
+    mediaList.setAttribute("hx-get", `/api/medias?page=${currentPage}`);
+  }
+
+  // Observateur d'intersection pour le chargement infini
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          const loadMore = entry.target.querySelector(
+            '[hx-trigger="intersect"]',
+          );
+          if (loadMore) {
+            htmx.trigger(loadMore, "intersect");
+            updateLoadUrl();
+          }
+        }
+      });
+    },
+    { rootMargin: "0px 0px 200px 0px" },
+  );
+
+  // Observer le conteneur principal
+  observer.observe(mediaList);
+
+  // Gérer l'opacité des nouveaux éléments
+  mediaList.addEventListener("htmx:afterOnLoad", function () {
+    if (document.getElementById("only-change").classList.contains("active")) {
+      document
+        .querySelectorAll(".media-item:not(.opacity-modified)")
+        .forEach((item) => {
+          item.classList.add("opacity-modified");
+        });
+    }
+  });
+});

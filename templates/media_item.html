@@ -1,3 +1,4 @@
+{{ define "media_item" }}
 <div
   class="media-item{{ if .Modified }} modified{{ end }}"
   id="media-item-{{ .Id }}"
@@ -5,15 +6,24 @@
   hx-get="/media/{{ .Id }}"
   hx-trigger="click"
   hx-target="#panel-content"
+  hx-swap="this"
   hx-on:click="htmx.takeClass('#media-item-{{ .Id }}', 'active'); setTimeout(()=>{this.scrollIntoView({behavior: 'smooth', block: 'center'})},500)"
-  _="on htmx:afterOnLoad wait 10ms then add .open to #side-panel then add .side-panel-open to #media-list then call initializeMap()"
+  _="on htmx:afterOnLoad 
+        add .open to #side-panel 
+        then add .side-panel-open to #media-list
+     on htmx:afterRequest 
+        call initializeMap()"
 >
   <h4>{{ .Name }}</h4>
   <div>
     {{ if eq .TypeMedia "video" }}
     <video src="{{ .Path }}" preload="metadata" controls></video>
     {{ else }}
-    <img src="{{ .Path }}" alt="" />
+    <img
+      src="{{ .Path }}"
+      alt=""
+      onerror="this.onerror=null; this.src='https://via.placeholder.com/400';"
+    />
     {{ end }}
   </div>
   <div class="media-item__details">
@@ -26,3 +36,4 @@
     </p>
   </div>
 </div>
+{{ end }}

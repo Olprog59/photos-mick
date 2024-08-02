@@ -1,7 +1,7 @@
 @import url("https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap");
 
 :root {
-  --max-item-width: 200px;
+  --max-item-width: 250px;
   --height: var(--max-item-width);
   --side-panel-width: 400px;
 }
@@ -24,6 +24,27 @@ body {
   }
 }
 
+.htmx-indicator {
+  display: none;
+}
+.htmx-request .htmx-indicator {
+  display: block;
+  margin: auto;
+  width: 50px;
+  height: 50px;
+}
+.htmx-request.htmx-indicator {
+  display: block;
+  margin: auto;
+  width: 50px;
+  height: 50px;
+}
+
+#call-pages {
+  height: 1px; /* Minimal height to ensure it's detected but doesn't take much space */
+  overflow: hidden;
+}
+
 main {
   display: flex;
   max-width: 100vw;
@@ -32,17 +53,20 @@ main {
 div#media-list {
   display: flex;
   justify-content: space-evenly;
-  align-items: center;
+  align-items: stretch;
   flex-wrap: wrap;
 
   width: calc(100% - var(--side-panel-width));
   transition: all 0.3s ease-in-out;
 
+  h1 {
+    width: 100%;
+    padding: 20px;
+  }
+
   div.media-item {
-    min-width: 150px;
-    max-width: 300px;
-    width: clamp(150px, calc(var(--max-item-width) + 20px), 300px);
-    height: auto;
+    width: var(--max-item-width);
+    height: max-content;
     margin: 10px;
     padding: 10px;
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
