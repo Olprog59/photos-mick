@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Photos MICK</title>
+    <script
+      src="https://unpkg.com/htmx.org@2.0.1"
+      integrity="sha384-QWGpdj554B4ETpJJC9z+ZHJcA/i59TyjxEPXiiUgN2WmTyV5OEZWCD6gQhgkdpB/"
+      crossorigin="anonymous"
+    ></script>
+    <script src="https://unpkg.com/hyperscript.org@0.9.12"></script>
+    <link href="style.css" rel="stylesheet" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"
+    />
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+  </head>
+  <body hx-boost="true">
+    <h1>Media Gallery</h1>
+    <main>
+      <div
+        id="media-list"
+        class="grid"
+        hx-get="/api/medias"
+        hx-trigger="load, mediaUpdated from:body"
+      ></div>
+
+      <div
+        class="only-change"
+        id="only-change"
+        _="on click 
+            toggle .active on me 
+            then toggle .opacity-modified on .media-item 
+            if me.hasClass('active') 
+            else remove .opacity-modified from .media-item"
+      >
+        Only Change
+      </div>
+
+      <div id="side-panel" class="side-panel">
+        <div class="panel-content" id="panel-content"></div>
+        <button
+          id="close-panel"
+          _="on click remove .open from #side-panel then remove .side-panel-open from #media-list then remove .active from .media-item"
+        >
+          x
+        </button>
+      </div>
+    </main>
+
+    <footer id="error_popover">
+      <div id="popover">
+        <span id="popover__close">x</span>
+        <p>Description de l'erreur</p>
+      </div>
+    </footer>
+
+    <script src="script.js"></script>
+  </body>
+</html>

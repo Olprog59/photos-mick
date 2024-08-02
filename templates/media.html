@@ -1,0 +1,28 @@
+<div
+  class="media-item{{ if .Modified }} modified{{ end }}"
+  id="media-item-{{ .Id }}"
+  data-id="{{ .Id }}"
+  hx-get="/media/{{ .Id }}"
+  hx-trigger="click"
+  hx-target="#panel-content"
+  hx-on:click="htmx.takeClass('#media-item-{{ .Id }}', 'active'); setTimeout(()=>{this.scrollIntoView({behavior: 'smooth', block: 'center'})},500)"
+  _="on htmx:afterOnLoad wait 10ms then add .open to #side-panel then add .side-panel-open to #media-list then call initializeMap()"
+>
+  <h4>{{ .Name }}</h4>
+  <div>
+    {{ if eq .TypeMedia "video" }}
+    <video src="{{ .Path }}" preload="metadata" controls></video>
+    {{ else }}
+    <img src="{{ .Path }}" alt="" />
+    {{ end }}
+  </div>
+  <div class="media-item__details">
+    <p><span>Creation Date:</span><span>{{ .Datetime | dateFR }}</span></p>
+    <p><span>TimeZone:</span><span>{{ .TimeZone }}</span></p>
+    <p><span>Longitude:</span><span>{{ .Longitude }}</span></p>
+    <p><span>Latitude:</span><span>{{ .Latitude }}</span></p>
+    <p class="description">
+      <span>Description:</span><span>{{ .Description }}</span>
+    </p>
+  </div>
+</div>

@@ -1,0 +1,5 @@
+medias/
+.air.toml
+go.sum
+output.json
+tmp
