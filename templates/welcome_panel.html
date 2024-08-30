@@ -1,0 +1,23 @@
+{{ define "welcome_panel" }}
+<div
+  id="welcome-panel"
+  class="welcome-panel"
+  hx-get="/api/medias/stats"
+  hx-trigger="load, mediaUpdated from:body"
+  hx-target="#stats-panel"
+>
+  <div>
+    <h2>Bienvenue dans votre galerie de médias à modifier</h2>
+    <p>
+      Sélectionnez un média pour voir plus de détails et d'options et le
+      modifier.
+    </p>
+    <ul>
+      <li>Cliquez sur une image pour voir les détails</li>
+      <li>Explorez votre collection en faisant défiler la galerie</li>
+    </ul>
+  </div>
+  <div id="stats-panel"></div>
+</div>
+
+{{ end }}

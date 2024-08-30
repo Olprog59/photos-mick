@@ -1,3 +1,4 @@
+{{ define "index" }}
 <!doctype html>
 <html lang="fr">
   <head>
@@ -29,13 +30,16 @@
     <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
   </head>
   <body hx-boost="true">
-    <main>
+    <main id="container">
       <div
         id="media-list"
-        hx-get="/api/medias?page=1"
-        hx-trigger="load, intersect once"
-        hx-swap="beforeend"
-      ></div>
+        hx-get="/api/medias"
+        hx-trigger="load, mediaUpdated from:body"
+        hx-swap="this"
+        hx-indicator="#loader"
+      >
+        <p id="loader" class="htmx-indicator">En cours de chargement ...</p>
+      </div>
 
       <div
         class="only-change"
@@ -54,20 +58,8 @@
       >
         Only Change
       </div>
-
-      <div id="side-panel" class="side-panel">
-        <div class="panel-content" id="panel-content"></div>
-        <button
-          id="close-panel"
-          _="on click 
-              remove .open from #side-panel 
-              then remove .side-panel-open from #media-list 
-              then remove .active from .media-item"
-        >
-          x
-        </button>
-      </div>
     </main>
+    {{ template "welcome_panel" . }} {{ template "media_details" . }}
 
     <footer id="error_popover">
       <div id="popover">
@@ -79,3 +71,4 @@
     <script src="script.js"></script>
   </body>
 </html>
+{{ end }}

@@ -3,7 +3,7 @@
   class="media-item{{ if .Modified }} modified{{ end }}"
   id="media-item-{{ .Id }}"
   data-id="{{ .Id }}"
-  hx-get="/media/{{ .Id }}"
+  hx-get="/api/media/{{ .Id }}"
   hx-trigger="click"
   hx-target="#panel-content"
   hx-swap="this"

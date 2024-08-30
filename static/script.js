@@ -107,53 +107,10 @@ document.addEventListener("htmx:afterRequest", (evt) => {
   }
 });
 
-document.addEventListener("htmx:configRequest", function (evt) {
-  evt.detail.headers["HX-Trigger"] = "mediaUpdated";
-});
-
-document.addEventListener("mediaUpdated", function () {
-  htmx.ajax("GET", "/api/medias", "#media-list");
-});
-
-document.addEventListener("DOMContentLoaded", function () {
-  let currentPage = 1;
-  const mediaList = document.getElementById("media-list");
-
-  // Fonction pour mettre à jour l'URL de chargement
-  function updateLoadUrl() {
-    currentPage++;
-    mediaList.setAttribute("hx-get", `/api/medias?page=${currentPage}`);
-  }
-
-  // Observateur d'intersection pour le chargement infini
-  const observer = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          const loadMore = entry.target.querySelector(
-            '[hx-trigger="intersect"]',
-          );
-          if (loadMore) {
-            htmx.trigger(loadMore, "intersect");
-            updateLoadUrl();
-          }
-        }
-      });
-    },
-    { rootMargin: "0px 0px 200px 0px" },
-  );
-
-  // Observer le conteneur principal
-  observer.observe(mediaList);
-
-  // Gérer l'opacité des nouveaux éléments
-  mediaList.addEventListener("htmx:afterOnLoad", function () {
-    if (document.getElementById("only-change").classList.contains("active")) {
-      document
-        .querySelectorAll(".media-item:not(.opacity-modified)")
-        .forEach((item) => {
-          item.classList.add("opacity-modified");
-        });
-    }
-  });
-});
+// document.addEventListener("htmx:configRequest", function (evt) {
+//   evt.detail.headers["HX-Trigger"] = "mediaUpdated";
+// });
+//
+// document.addEventListener("mediaUpdated", function () {
+//   htmx.ajax("GET", "/api/medias", "#media-list");
+// });

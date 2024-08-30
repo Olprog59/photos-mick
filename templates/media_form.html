@@ -2,7 +2,7 @@
 <div>
   <h4>Edit Media Information</h4>
   <form
-    hx-put="/media/{{ .Id }}"
+    hx-put="/api/media/{{ .Id }}"
     hx-target="#media-item-{{ .Id }}"
     hx-swap="outerHTML"
     _="on htmx:afterOnLoad
@@ -68,7 +68,7 @@
         <option value="-03:00" {{ if eq .TimeZone "-03:00" }}selected{{ end }}>(GMT -3:00) Brazil, Buenos Aires, Georgetown</option>
         <option value="-02:00" {{ if eq .TimeZone "-02:00" }}selected{{ end }}>(GMT -2:00) Mid-Atlantic</option>
         <option value="-01:00" {{ if eq .TimeZone "-01:00" }}selected{{ end }}>(GMT -1:00 hour) Azores, Cape Verde Islands</option>
-        <option value="+00:00" {{ if eq .TimeZone "+00:00" }}selected{{ end }}>(GMT) Western Europe Time, London, Lisbon, Casablanca</option>
+        <option value="+00:00" {{ if or (eq .TimeZone "+00:00") (eq .TimeZone "UTC") }}selected{{ end }}>(GMT) Western Europe Time, London, Lisbon, Casablanca</option>
         <option value="+01:00" {{ if eq .TimeZone "+01:00" }}selected{{ end }}>(GMT +1:00 hour) Brussels, Copenhagen, Madrid, Paris</option>
         <option value="+02:00" {{ if eq .TimeZone "+02:00" }}selected{{ end }}>(GMT +2:00) Heure d'été Brussels, Copenhagen, Madrid, Paris</option>
         <option value="+03:00" {{ if eq .TimeZone "+03:00" }}selected{{ end }}>(GMT +3:00) Baghdad, Riyadh, Moscow, St. Petersburg</option>
@@ -121,6 +121,7 @@
   hx-on:click="
     htmx.removeClass(document.getElementById('side-panel'), 'open');
     htmx.removeClass(document.getElementById('media-list'), 'side-panel-open');
+    htmx.removeClass(document.getElementById('only-change'), 'active');
     "
 >Save</button>
     </div>

@@ -1,0 +1,30 @@
+{{ define "stats_panel" }}
+<h3>Votre Collection en Chiffres</h3>
+<div class="stats-panel">
+  <div class="stat-item">
+    <span class="stat-value">{{ .TotalMedias }}</span>
+    <span class="stat-label">Médias au total</span>
+  </div>
+  <div class="stat-item">
+    <span class="stat-value">{{ .PhotoCount }}</span>
+    <span class="stat-label">Photos</span>
+  </div>
+  <div class="stat-item">
+    <span class="stat-value">{{ .VideoCount }}</span>
+    <span class="stat-label">Vidéos</span>
+  </div>
+  <div class="stat-item">
+    <span class="stat-value">{{ .OldestDate }}</span>
+    <span class="stat-label">Plus ancien média</span>
+  </div>
+  <div class="stat-item">
+    <span class="stat-value">{{ .NewestDate }}</span>
+    <span class="stat-label">Plus récent média</span>
+  </div>
+  <div class="stat-item one-line end">
+    <span class="stat-label"
+      ><a href="/api/json" target="_blank">Voir le JSON</a></span
+    >
+  </div>
+</div>
+{{ end }}

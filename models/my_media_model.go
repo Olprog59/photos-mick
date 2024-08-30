@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,23 +15,27 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Olprog59/golog"
 	"github.com/Olprog59/photos-mick/commons"
 	"github.com/evanoberholster/imagemeta"
 	"github.com/evanoberholster/imagemeta/exif2"
 )
 
 type MyMedia struct {
+	Description string `json:"description"`
 	FileName    string `json:"original_name"`
-	Datetime    string `json:"date_time"`
 	Name        string
 	Path        string  `json:"path"`
 	TimeZone    string  `json:"time_zone"`
 	TypeMedia   string  `json:"type"`
-	Description string  `json:"description"`
-	Id          int     `json:"id"`
-	Longitude   float64 `json:"longitude"`
+	Datetime    string  `json:"date_time"`
+	Format      string  `json:"format"`
 	Latitude    float64 `json:"latitude"`
+	Longitude   float64 `json:"longitude"`
+	Id          int     `json:"id"`
+	Duration    int     `json:"duree"`
 	Modified    bool    `json:"modified"`
+	Journee     int8    `json:"journee"`
 }
 
 func ReadFileToSlice(medias *[]MyMedia) {
@@ -77,10 +82,11 @@ func sortByDatetime(medias []MyMedia) {
 //		log.Println("Les données JSON ont été écrites dans le fichier output.json")
 //	}
 
-func getMetadata(photo string) exif2.Exif {
+func getMetadata(photo string) (*exif2.Exif, error) {
 	file, err := os.Open(photo)
 	if err != nil {
 		log.Fatal(err)
+		return nil, err
 	}
 
 	defer file.Close()
@@ -88,9 +94,10 @@ func getMetadata(photo string) exif2.Exif {
 	x, err := imagemeta.Decode(file)
 	if err != nil {
 		log.Fatal(err)
+		return nil, err
 	}
 
-	return x
+	return &x, nil
 }
 
 // parseGPSCoordinates parses a GPS coordinate string and returns the latitude and longitude.
@@ -118,7 +125,7 @@ func parseGPSCoordinates(coord string) (float64, float64, error) {
 	return lat, lon, nil
 }
 
-func getMetadataVideos(file string) (date, zone string, longitude, latitude float64) {
+func getMetadataVideos(file string) (date, zone string, longitude, latitude float64, width, height, duration int) {
 	cmd := exec.Command("mediainfo", file, "--output=JSON")
 
 	var err error
@@ -135,6 +142,28 @@ func getMetadataVideos(file string) (date, zone string, longitude, latitude floa
 	}
 
 	var parsedDate time.Time
+
+	for _, m := range media.Media.Track {
+		f, err := strconv.ParseFloat(*m.Duration, 32)
+		if err != nil {
+			golog.Err("Error: %+v", err)
+		}
+		duration = int(math.Ceil(f))
+	}
+
+	for _, m := range media.Media.Track {
+		if m.Width != nil || m.Height != nil {
+			width, err = strconv.Atoi(*m.Width)
+			if err != nil {
+				golog.Err("Error: %+v", err)
+			}
+			height, err = strconv.Atoi(*m.Height)
+			if err != nil {
+				golog.Err("Error: %+v", err)
+			}
+			break
+		}
+	}
 
 	for _, m := range media.Media.Track {
 		if m.Extra != nil {
@@ -165,26 +194,30 @@ func getMetadataVideos(file string) (date, zone string, longitude, latitude floa
 		}
 	}
 
+	// golog.Info("Date: %s", date)
 	parsedDate, err = time.Parse("2006-01-02T15:04:05-0700", date)
 	if err != nil {
 		parsedDate, err = time.Parse("2006-01-02T15:04:05-07:00", date)
 		if err != nil {
 			parsedDate, err = time.Parse("2006-01-02 15:04:05 UTC", date)
 			if err != nil {
-				log.Fatal(err)
+				parsedDate, err = time.Parse("2006-01-02T15:04:05", date)
+				if err != nil {
+					log.Fatal(err)
+				}
 			}
 		}
 	}
 
 	zone, _ = parsedDate.Zone()
 	date = parsedDate.Format(commons.DateFormatWithSeconds)
-	return date, zone, longitude, latitude
+	return date, zone, longitude, latitude, width, height, duration
 }
 
-func GetMetadataPhotos() []MyMedia {
+func GetMetadataPhotos(folder string) []MyMedia {
 	var medias []MyMedia
 
-	err := filepath.Walk("medias", func(path string, info fs.FileInfo, err error) error {
+	err := filepath.Walk(folder, func(path string, info fs.FileInfo, err error) error {
 		if info.IsDir() {
 			return nil
 		}
@@ -192,28 +225,66 @@ func GetMetadataPhotos() []MyMedia {
 		name := strings.ToLower(info.Name())
 		ext := filepath.Ext(name)
 
+		dateStart, err := time.Parse("2006-01-02", commons.DateStr)
+		if err != nil {
+			golog.Err("Error: %+v", err)
+		}
+
 		switch ext {
 		case ".jpeg", ".jpg", ".heic":
-			exif := getMetadata(path)
+			exif, err := getMetadata(path)
+			if err != nil {
+				log.Println(err)
+			}
+
 			zone, _ := exif.DateTimeOriginal().Zone()
+			w := exif.ImageWidth
+			h := exif.ImageHeight
+
+			format := ""
+			if w > h {
+				format = "largeur"
+			} else if h > w {
+				format = "hauteur"
+			} else {
+				format = "carre"
+			}
+
 			m := MyMedia{
-				FileName:  name,
-				Datetime:  exif.DateTimeOriginal().Format(commons.DateFormatWithSeconds),
-				Name:      name[:len(name)-len(ext)],
-				Path:      path,
-				TimeZone:  zone,
-				TypeMedia: "photo",
-				Latitude:  exif.GPS.Latitude(),
-				Longitude: exif.GPS.Longitude(),
+				FileName:    name,
+				Datetime:    exif.DateTimeOriginal().Format(commons.DateFormatWithSeconds),
+				Name:        name[:len(name)-len(ext)],
+				Path:        path,
+				TimeZone:    zone,
+				TypeMedia:   "photo",
+				Latitude:    exif.GPS.Latitude(),
+				Longitude:   exif.GPS.Longitude(),
+				Description: exif.ImageDescription,
+				Format:      format,
+				Journee:     int8(exif.DateTimeOriginal().Sub(dateStart).Hours() / 24),
 			}
 
 			medias = append(medias, m)
 		case ".mp4", ".mov":
-			dateVideo, zone, longitude, latitude := getMetadataVideos(path)
+			dateVideo, zone, longitude, latitude, w, h, duration := getMetadataVideos(path)
 			// format, err := time.Parse(dateFormatWithSeconds, dateVideo)
 			if err != nil {
-				log.Println(err)
+				golog.Err("Error: %+v", err)
 			}
+			format := ""
+			if w > h {
+				format = "largeur"
+			} else if h > w {
+				format = "hauteur"
+			} else {
+				format = "carre"
+			}
+
+			datetime, err := time.Parse(commons.DateFormatWithSeconds, dateVideo)
+			if err != nil {
+				golog.Err("Error: %+v", err)
+			}
+
 			m := MyMedia{
 				FileName:  name,
 				Datetime:  dateVideo,
@@ -223,6 +294,9 @@ func GetMetadataPhotos() []MyMedia {
 				TypeMedia: "video",
 				Longitude: longitude,
 				Latitude:  latitude,
+				Format:    format,
+				Duration:  duration,
+				Journee:   int8(datetime.Sub(dateStart).Hours() / 24),
 			}
 
 			medias = append(medias, m)

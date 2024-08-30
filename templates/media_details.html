@@ -1,0 +1,14 @@
+{{ define "media_details" }}
+<div id="side-panel" class="side-panel">
+  <div class="panel-content" id="panel-content"></div>
+  <button
+    id="close-panel"
+    _="on click 
+              remove .open from #side-panel 
+              then remove .side-panel-open from #media-list 
+              then remove .active from .media-item"
+  >
+    x
+  </button>
+</div>
+{{ end }}

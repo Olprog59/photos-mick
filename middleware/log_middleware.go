@@ -1,9 +1,10 @@
 package middleware
 
 import (
-	"log"
 	"net/http"
 	"time"
+
+	"github.com/Olprog59/golog"
 )
 
 // LoggingMiddleware est un middleware qui enregistre les informations sur chaque requête HTTP
@@ -21,7 +22,7 @@ func LoggingMiddleware(next http.Handler) http.Handler {
 		duration := time.Since(start)
 
 		// Enregistrez les informations de la requête
-		log.Printf(
+		golog.Success(
 			"[%s] %s %s %d %v",
 			r.Method,
 			r.RequestURI,

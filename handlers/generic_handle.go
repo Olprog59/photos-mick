@@ -1,19 +1,15 @@
-package handles
+package handlers
 
 import (
 	"html/template"
+	"io/fs"
 	"log"
 	"net/http"
 	"path/filepath"
-	"sync"
 	"time"
 
+	"github.com/Olprog59/golog"
 	"github.com/Olprog59/photos-mick/commons"
-)
-
-var (
-	templates     *template.Template
-	templateMutex sync.RWMutex
 )
 
 func loadTemplates() (*template.Template, error) {
@@ -21,27 +17,41 @@ func loadTemplates() (*template.Template, error) {
 		"dateFR": func(datetime string) string {
 			t, err := time.Parse(commons.DateFormatWithSeconds, datetime)
 			if err != nil {
-				log.Printf("Erreur de format de date: %v", err)
+				golog.Err("Erreur de format de date: %v", err)
 				return "Date invalide"
 			}
 			return t.Format("Monday 02 January 2006 15:04:05")
 		},
 	}
 
-	log.Println("Chargement des templates")
+	golog.Info("Chargement des templates intégrés")
 
-	globPattern := filepath.Join(commons.TemplateDir, "*.html")
-	log.Printf("Chargement des templates depuis %s", globPattern)
-	tmpl, err := template.New("").Funcs(funcMap).ParseGlob(globPattern)
+	// Charger les templates à partir des fichiers intégrés
+	templatesFS, err := fs.Sub(templateFS, "templates")
 	if err != nil {
 		return nil, err
 	}
 
-	// Log des templates chargés
-	for _, t := range tmpl.Templates() {
-		log.Printf("Template chargé: %s", t.Name())
+	tmpl := template.New("").Funcs(funcMap)
+	err = fs.WalkDir(templatesFS, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() {
+			content, err := fs.ReadFile(templatesFS, path)
+			if err != nil {
+				return err
+			}
+			tmpl, err = tmpl.New(filepath.Base(path)).Parse(string(content))
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
-
 	return tmpl, nil
 }
 
