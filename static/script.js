@@ -87,6 +87,7 @@ mutationObserver.observe(footer, { attributes: true });
 document.addEventListener("htmx:afterRequest", (evt) => {
   const popover = footer.querySelector("div#popover");
 
+  console.log(evt.detail);
   const failed = evt.detail.failed;
 
   if (failed) {
@@ -95,14 +96,31 @@ document.addEventListener("htmx:afterRequest", (evt) => {
     popover.querySelector("p").innerText = evt.detail.xhr.responseText;
     popover.classList.add("error");
   } else {
-    const data = evt.detail.xhr.responseText;
     const header = evt.detail.xhr.getResponseHeader("Message");
 
-    if (data && header) {
-      popover.className = "";
-      footer.classList.add("active");
-      popover.querySelector("p").innerText = header;
-      popover.classList.add("success");
+    if (header) {
+      try {
+        // Décodez le message Base64
+        const decodedBytes = atob(header);
+        // Convertissez les bytes décodés en une chaîne UTF-8
+        const decodedMessage = new TextDecoder("utf-8").decode(
+          new Uint8Array([...decodedBytes].map((c) => c.charCodeAt(0))),
+        );
+
+        console.log("Message reçu (Base64):", header);
+        console.log("Message après atob:", decodedBytes);
+        console.log("Message final décodé:", decodedMessage);
+
+        popover.className = "";
+        footer.classList.add("active");
+        popover.querySelector("p").innerText = decodedMessage;
+        popover.classList.add("success");
+      } catch (error) {
+        console.error("Erreur lors du décodage:", error);
+        popover.querySelector("p").innerText =
+          "Erreur lors du décodage du message";
+        popover.classList.add("error");
+      }
     }
   }
 });

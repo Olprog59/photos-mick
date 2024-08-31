@@ -3,7 +3,6 @@ package handlers
 import (
 	"html/template"
 	"io/fs"
-	"log"
 	"net/http"
 	"path/filepath"
 	"time"
@@ -60,21 +59,21 @@ func handleGeneric(w http.ResponseWriter, data any, mainTemplate string) {
 
 	tmpl, err := loadTemplates()
 	if err != nil {
-		log.Printf("Erreur lors du chargement des templates: %v", err)
+		golog.Err("Erreur lors du chargement des templates: %v", err)
 		http.Error(w, "Erreur interne du serveur", http.StatusInternalServerError)
 		return
 	}
 
 	// Vérifier si le template principal existe
 	if tmpl.Lookup(mainTemplate) == nil {
-		log.Printf("Le template principal '%s' n'existe pas", mainTemplate)
+		golog.Err("Le template principal '%s' n'existe pas", mainTemplate)
 		http.Error(w, "Template non trouvé", http.StatusInternalServerError)
 		return
 	}
 
 	err = tmpl.ExecuteTemplate(w, mainTemplate, data)
 	if err != nil {
-		log.Printf("Erreur lors de l'exécution du template %s: %v", mainTemplate, err)
+		golog.Err("Erreur lors de l'exécution du template %s: %v", mainTemplate, err)
 		http.Error(w, "Erreur interne du serveur", http.StatusInternalServerError)
 	}
 }

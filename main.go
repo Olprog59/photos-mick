@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"flag"
 	"io/fs"
-	"log"
 	"net/http"
 	"os"
 
@@ -23,7 +22,7 @@ var templateFS embed.FS
 var static embed.FS
 
 func init() {
-	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
+	// log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 	_ = handlers.ReloadTemplates()
 	golog.SetLanguage("fr")
 	golog.EnableFileNameLogging()
@@ -63,10 +62,13 @@ func main() {
 	}
 
 	golog.Notice("Welcome. Started application and analyse medias.")
+	golog.Notice("Wait a moment please ...")
 
 	medias := models.GetMetadataPhotos(folder)
 
 	models.ReadFileToSlice(&medias)
+
+	golog.Notice("... end of analysis")
 
 	handlers.InitHandlers(templateFS)
 
@@ -82,11 +84,13 @@ func main() {
 
 	mux.HandleFunc("PUT /api/media/{id}", handlers.UpdateMedia(&medias))
 
+	mux.HandleFunc("DELETE /api/rename/{id}", handlers.RenameMedia(&medias))
+
 	mux.HandleFunc("GET /api/json", handlers.JsonExtract(medias))
 
 	fsys, err := fs.Sub(static, "static")
 	if err != nil {
-		log.Fatal(err)
+		golog.Err(err.Error())
 	}
 
 	mux.Handle("/", http.FileServer(http.FS(fsys)))

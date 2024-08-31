@@ -9,21 +9,47 @@
   hx-swap="this"
   hx-on:click="htmx.takeClass('#media-item-{{ .Id }}', 'active'); setTimeout(()=>{this.scrollIntoView({behavior: 'smooth', block: 'center'})},500)"
   _="on htmx:afterOnLoad 
-        add .open to #side-panel 
-        then add .side-panel-open to #media-list
+        if event.detail.requestConfig.verb != 'delete'
+          add .open to #side-panel 
+          then add .side-panel-open to #media-list
+        end
      on htmx:afterRequest 
-        call initializeMap()"
+        if event.detail.requestConfig.verb != 'delete'
+          call initializeMap()
+        end
+  "
 >
-  <h4>{{ .Name }}</h4>
+  <h4>
+    {{ .Name }}
+    <span
+      class="delete"
+      hx-delete="/api/rename/{{ .Id }}"
+      hx-confirm="Are you sure you want to delete {{ .Path }}?"
+      hx-trigger="click consume"
+      hx-swap="none"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="24"
+        height="24"
+        fill="currentColor"
+        class="bi bi-trash"
+        viewBox="0 0 16 16"
+      >
+        <path
+          d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"
+        />
+        <path
+          d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"
+        />
+      </svg>
+    </span>
+  </h4>
   <div>
     {{ if eq .TypeMedia "video" }}
     <video src="{{ .Path }}" preload="metadata" controls></video>
     {{ else }}
-    <img
-      src="{{ .Path }}"
-      alt=""
-      onerror="this.onerror=null; this.src='https://via.placeholder.com/400';"
-    />
+    <img src="{{ .Path }}" alt="" />
     {{ end }}
   </div>
   <div class="media-item__details">

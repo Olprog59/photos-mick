@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -37,7 +36,7 @@ func FindByID(medias *[]models.MyMedia) http.HandlerFunc {
 			return
 		}
 		media := (*medias)[id]
-		log.Printf("Media found: %v", media)
+		golog.Info("Media found: %v", media)
 		handleGeneric(w, media, "media_form")
 	}
 }
@@ -69,7 +68,7 @@ func UpdateMedia(medias *[]models.MyMedia) http.HandlerFunc {
 		}
 
 		if (*medias)[id].TypeMedia == "video" {
-			// err := updateMetadataVideo(medias[id])
+			// err := updateMetadataVideo((*medias)[id])
 			// if err != nil {
 			// 	golog.Err("%s", err.Error())
 			// }
@@ -93,46 +92,133 @@ func UpdateMedia(medias *[]models.MyMedia) http.HandlerFunc {
 	}
 }
 
-// func updateMetadataVideo(media models.MyMedia) error {
-// 	formatDateWithoutTimeZone, err := commons.ConvertISOToExifTime(media.Datetime)
-// 	if err != nil {
-// 		golog.Err("Error converting to Exif time:", err)
-// 		return err
-// 	}
-//
-// 	outputFile := "medias/temp_" + media.FileName
-//
-// 	gpsLatitude := fmt.Sprintf("%.8f", media.Latitude)
-// 	gpsLongitude := fmt.Sprintf("%.8f", media.Longitude)
-// 	cmd := exec.Command("ffmpeg",
-// 		"-i", media.Path,
-// 		"-metadata", "creation_time="+formatDateWithoutTimeZone,
-// 		"-metadata", "modify_date="+formatDateWithoutTimeZone,
-// 		"-metadata", "date="+formatDateWithoutTimeZone,
-// 		"-metadata", "DateTimeOriginal="+formatDateWithoutTimeZone,
-// 		"-metadata", "time_zone="+media.TimeZone,
-// 		"-metadata", "location="+gpsLatitude+","+gpsLongitude,
-// 		"-metadata", "description="+media.Description,
-// 		"-c", "copy",
-// 		"-y",
-// 		outputFile,
-// 	)
-//
-// 	golog.Info(cmd.String())
-//
-// 	// Exécuter la commande
-// 	err = cmd.Run()
-// 	if err != nil {
-// 		return err
-// 	}
-//
-// 	// Remplacer le fichier original par le nouveau fichier
-// 	err = os.Rename(outputFile, media.Path)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	return nil
-// }
+func RenameMedia(medias *[]models.MyMedia) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		idStr := r.PathValue("id")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			http.Error(w, "Invalid media ID", http.StatusBadRequest)
+			return
+		}
+		if id < 0 || id >= len(*medias) {
+			http.Error(w, "Media not found", http.StatusNotFound)
+			return
+		}
+		media := (*medias)[id]
+		// rename file to *.removed
+		err = os.Rename(media.Path, media.Path+".removed")
+		if err != nil {
+			golog.Err("%s", err.Error())
+			return
+		}
+
+		// delete media from slice
+		*medias = append((*medias)[:id], (*medias)[id+1:]...)
+
+		models.ReadFileToSlice(medias)
+
+		messageHeader(&w, "%s a été supprimé. (renommé avec .removed)", media.FileName)
+		w.Header().Set("HX-Trigger", "mediaUpdated")
+		// handleGeneric(w, media, "media_item")
+		fmt.Fprint(w, "Media removed")
+	}
+}
+
+func updateMetadataVideo(media models.MyMedia) error {
+	formatDateWithoutTimeZone, err := commons.ConvertISOToExifTime(media.Datetime)
+	if err != nil {
+		golog.Err("Error converting to Exif time: %v", err)
+		return err
+	}
+
+	tempFile := media.Path + ".temp.mp4"
+
+	// Copier le fichier original vers le fichier temporaire
+	if err := copyFile(media.Path, tempFile); err != nil {
+		golog.Err("Failed to create temporary file: %v", err)
+		return err
+	}
+
+	// Préparer la commande ExifTool pour une réécriture complète des métadonnées
+	cmd := exec.Command("exiftool",
+		"-overwrite_original",
+		"-P",                     // Préserver la date de modification du fichier
+		"-api", "QuickTimeUTC=1", // Traiter les dates QuickTime comme UTC
+		fmt.Sprintf("-CreateDate=%s", formatDateWithoutTimeZone),
+		fmt.Sprintf("-ModifyDate=%s", formatDateWithoutTimeZone),
+		fmt.Sprintf("-MediaCreateDate=%s", formatDateWithoutTimeZone),
+		fmt.Sprintf("-MediaModifyDate=%s", formatDateWithoutTimeZone),
+		fmt.Sprintf("-TrackCreateDate=%s", formatDateWithoutTimeZone),
+		fmt.Sprintf("-TrackModifyDate=%s", formatDateWithoutTimeZone),
+		fmt.Sprintf("-DateTimeOriginal=%s", formatDateWithoutTimeZone),
+		fmt.Sprintf("-ContentCreateDate=%s", formatDateWithoutTimeZone),
+		fmt.Sprintf("-GPSLatitude=%f", media.Latitude),
+		fmt.Sprintf("-GPSLongitude=%f", media.Longitude),
+		fmt.Sprintf("-GPSLatitudeRef=%s", getLatitudeRef(media.Latitude)),
+		fmt.Sprintf("-GPSLongitudeRef=%s", getLongitudeRef(media.Longitude)),
+		fmt.Sprintf("-OffsetTime=%s", media.TimeZone),
+		fmt.Sprintf("-TimeZone=%s", media.TimeZone),
+		fmt.Sprintf("-Description=%s", media.Description),
+		// Champs personnalisés
+		fmt.Sprintf("-XMP-x:CustomTimeZone=%s", media.TimeZone),
+		fmt.Sprintf("-XMP-x:CustomLatitude=%f", media.Latitude),
+		fmt.Sprintf("-XMP-x:CustomLongitude=%f", media.Longitude),
+		tempFile,
+	)
+
+	golog.Debug("Executing ExifTool command: %s", cmd.String())
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		golog.Err("ExifTool command failed: %v\nOutput: %s", err, string(output))
+		os.Remove(tempFile)
+		return fmt.Errorf("exiftool failed: %w", err)
+	}
+
+	// Vérifier si le fichier temporaire est lisible
+	if !isVideoPlayable(tempFile) {
+		golog.Err("Temporary file is not playable after metadata update")
+		os.Remove(tempFile)
+		return fmt.Errorf("temporary file became unplayable after metadata update")
+	}
+
+	// Remplacer l'ancien fichier par le nouveau
+	if err := os.Rename(tempFile, media.Path); err != nil {
+		golog.Err("Failed to replace original file: %v", err)
+		os.Remove(tempFile)
+		return err
+	}
+
+	golog.Info("Video metadata updated successfully for file: %s", media.Path)
+	return nil
+}
+
+func getLatitudeRef(latitude float64) string {
+	if latitude >= 0 {
+		return "N"
+	}
+	return "S"
+}
+
+func getLongitudeRef(longitude float64) string {
+	if longitude >= 0 {
+		return "E"
+	}
+	return "W"
+}
+
+func copyFile(src, dst string) error {
+	input, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(dst, input, 0644)
+}
+
+func isVideoPlayable(filePath string) bool {
+	cmd := exec.Command("ffprobe", "-v", "error", filePath)
+	return cmd.Run() == nil
+}
 
 func updateMetadataPhoto(media *models.MyMedia) {
 	// Update metadata with exiftool
@@ -240,7 +326,7 @@ func updateMediaInfo(newName string, medias *[]models.MyMedia, id int, w http.Re
 
 	parsedTime, err := time.Parse(dateFormat, r.FormValue("date_time"))
 	if err != nil {
-		log.Println("Error parsing date_time:", err)
+		golog.Debug("Error parsing date_time:", err)
 		http.Error(w, "Invalid date format", http.StatusBadRequest)
 		return err
 	}

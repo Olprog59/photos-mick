@@ -2,10 +2,10 @@ package models
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"log"
-	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -39,23 +39,55 @@ type MyMedia struct {
 }
 
 func ReadFileToSlice(medias *[]MyMedia) {
-	sortByDatetime(*medias)
+	// sortByDatetime(*medias)
+	sortByDatetimeAndTimezone(medias)
 
 	for i := 0; i < len(*medias); i++ {
 		(*medias)[i].Id = i
 	}
 }
 
-func sortByDatetime(medias []MyMedia) {
-	sort.Slice(medias, func(i, j int) bool {
-		ti, err1 := time.Parse(commons.DateFormatWithSeconds, medias[i].Datetime)
-		tj, err2 := time.Parse(commons.DateFormatWithSeconds, medias[j].Datetime)
+func sortByDatetimeAndTimezone(medias *[]MyMedia) {
+	sort.Slice(*medias, func(i, j int) bool {
+		if (*medias)[i].TimeZone == "" || (*medias)[i].TimeZone == "UTC" {
+			(*medias)[i].TimeZone = "+00:00"
+		}
+
+		if (*medias)[j].TimeZone == "" || (*medias)[j].TimeZone == "UTC" {
+			(*medias)[j].TimeZone = "+00:00"
+		}
+
+		// Concaténer la date et le fuseau horaire
+		timeStrI := (*medias)[i].Datetime + (*medias)[i].TimeZone
+		timeStrJ := (*medias)[j].Datetime + (*medias)[j].TimeZone
+
+		// golog.Info("dateTimeI: %s", timeStrI)
+		// golog.Info("dateTimeJ: %s", timeStrJ)
+
+		// Analyser la chaîne de date avec fuseau horaire
+		ti, err1 := time.Parse("2006-01-02T15:04:05-07:00", timeStrI)
+		tj, err2 := time.Parse("2006-01-02T15:04:05-07:00", timeStrJ)
+
 		if err1 != nil || err2 != nil {
+			// Gérer les erreurs si nécessaire
 			return false
 		}
+
+		// Comparer les temps en UTC
 		return ti.Before(tj)
 	})
 }
+
+// func sortByDatetime(medias []MyMedia) {
+// 	sort.Slice(medias, func(i, j int) bool {
+// 		ti, err1 := time.Parse(commons.DateFormatWithSeconds, medias[i].Datetime)
+// 		tj, err2 := time.Parse(commons.DateFormatWithSeconds, medias[j].Datetime)
+// 		if err1 != nil || err2 != nil {
+// 			return false
+// 		}
+// 		return ti.Before(tj)
+// 	})
+// }
 
 //	func writeFile(medias []MyMedia) {
 //		jsonData, err := json.MarshalIndent(medias, " ", " ")
@@ -126,100 +158,97 @@ func parseGPSCoordinates(coord string) (float64, float64, error) {
 }
 
 func getMetadataVideos(file string) (date, zone string, longitude, latitude float64, width, height, duration int) {
-	cmd := exec.Command("mediainfo", file, "--output=JSON")
+	cmd := exec.Command("exiftool", "-json", "-n", file)
 
-	var err error
 	var out bytes.Buffer
 	cmd.Stdout = &out
-	err = cmd.Run()
+	err := cmd.Run()
 	if err != nil {
-		log.Fatal(err)
+		golog.Err("Failed to execute exiftool for file %s: %v", file, err)
+		return
 	}
 
-	media, err := UnmarshalMediaInfo(out.Bytes())
-	if err != nil {
-		log.Fatal(err)
+	var exifData []map[string]interface{}
+	if err := json.Unmarshal(out.Bytes(), &exifData); err != nil {
+		golog.Err("Failed to unmarshal exiftool output for file %s: %v", file, err)
+		return
 	}
 
-	var parsedDate time.Time
+	if len(exifData) == 0 {
+		golog.Warn("No metadata found for file %s", file)
+		return
+	}
 
-	for _, m := range media.Media.Track {
-		f, err := strconv.ParseFloat(*m.Duration, 32)
-		if err != nil {
-			golog.Err("Error: %+v", err)
+	metadata := exifData[0]
+
+	// Extract date
+	datePriority := []string{"ContentCreateDate", "DateTimeOriginal", "CreateDate", "ModifyDate"}
+	for _, dateField := range datePriority {
+		if dateStr, ok := metadata[dateField].(string); ok && dateStr != "0000:00:00 00:00:00" {
+			parsedDate, err := time.Parse("2006:01:02 15:04:05", dateStr)
+			if err == nil {
+				date = parsedDate.Format(commons.DateFormatWithSeconds)
+				break
+			}
 		}
-		duration = int(math.Ceil(f))
 	}
 
-	for _, m := range media.Media.Track {
-		if m.Width != nil || m.Height != nil {
-			width, err = strconv.Atoi(*m.Width)
-			if err != nil {
-				golog.Err("Error: %+v", err)
-			}
-			height, err = strconv.Atoi(*m.Height)
-			if err != nil {
-				golog.Err("Error: %+v", err)
-			}
+	// Extract timezone
+	zonePriority := []string{"CustomTimeZone", "OffsetTime", "TimeZone"}
+	for _, zoneField := range zonePriority {
+		if zoneStr, ok := metadata[zoneField].(string); ok && zoneStr != "" {
+			zone = zoneStr
 			break
 		}
 	}
 
-	for _, m := range media.Media.Track {
-		if m.Extra != nil {
-			if m.Extra.COMAppleQuicktimeCreationdate != nil {
-				date = *m.Extra.COMAppleQuicktimeCreationdate
-				break
-			}
+	// Extract GPS coordinates
+	if customLatitude, ok := metadata["CustomLatitude"].(float64); ok {
+		latitude = customLatitude
+	} else if gpsLatitude, ok := metadata["GPSLatitude"].(float64); ok {
+		latitude = gpsLatitude
+	}
+
+	if customLongitude, ok := metadata["CustomLongitude"].(float64); ok {
+		longitude = customLongitude
+	} else if gpsLongitude, ok := metadata["GPSLongitude"].(float64); ok {
+		longitude = gpsLongitude
+	}
+
+	// Extract width and height
+	if imageWidth, ok := metadata["ImageWidth"].(float64); ok {
+		width = int(imageWidth)
+	}
+	if imageHeight, ok := metadata["ImageHeight"].(float64); ok {
+		height = int(imageHeight)
+	}
+
+	// Extract duration
+	if durationStr, ok := metadata["Duration"].(string); ok {
+		durationFloat, err := strconv.ParseFloat(durationStr, 64)
+		if err == nil {
+			duration = int(durationFloat)
 		}
 	}
 
-	for _, m := range media.Media.Track {
-		if date == "" {
-			date = *m.EncodedDate
-		}
+	if date == "" {
+		date = "2021-01-01T00:00:00"
+		golog.Warn("No valid date found for file %s", file)
 	}
 
-	for _, m := range media.Media.Track {
-		if m.Extra != nil {
-			if m.Extra.COMAppleQuicktimeLocationISO6709 != nil {
-				latitude, longitude, err = parseGPSCoordinates(*m.Extra.COMAppleQuicktimeLocationISO6709)
-				if err != nil {
-					log.Println(err)
-					break
-				}
-				break
-
-			}
-		}
-	}
-
-	// golog.Info("Date: %s", date)
-	parsedDate, err = time.Parse("2006-01-02T15:04:05-0700", date)
-	if err != nil {
-		parsedDate, err = time.Parse("2006-01-02T15:04:05-07:00", date)
-		if err != nil {
-			parsedDate, err = time.Parse("2006-01-02 15:04:05 UTC", date)
-			if err != nil {
-				parsedDate, err = time.Parse("2006-01-02T15:04:05", date)
-				if err != nil {
-					log.Fatal(err)
-				}
-			}
-		}
-	}
-
-	zone, _ = parsedDate.Zone()
-	date = parsedDate.Format(commons.DateFormatWithSeconds)
 	return date, zone, longitude, latitude, width, height, duration
 }
 
 func GetMetadataPhotos(folder string) []MyMedia {
 	var medias []MyMedia
 
-	err := filepath.Walk(folder, func(path string, info fs.FileInfo, err error) error {
+	err := filepath.Walk(folder, func(path string, info fs.FileInfo, errr error) error {
 		if info.IsDir() {
 			return nil
+		}
+
+		if errr != nil {
+			return errr
 		}
 
 		name := strings.ToLower(info.Name())
@@ -231,10 +260,10 @@ func GetMetadataPhotos(folder string) []MyMedia {
 		}
 
 		switch ext {
-		case ".jpeg", ".jpg", ".heic":
+		case ".jpeg", ".jpg", ".heic", "webp", ".png", ".gif":
 			exif, err := getMetadata(path)
 			if err != nil {
-				log.Println(err)
+				golog.Err("Error: %+v", err)
 			}
 
 			zone, _ := exif.DateTimeOriginal().Zone()
@@ -248,6 +277,10 @@ func GetMetadataPhotos(folder string) []MyMedia {
 				format = "hauteur"
 			} else {
 				format = "carre"
+			}
+
+			if zone == "" || zone == "UTC" {
+				zone = "+00:00"
 			}
 
 			m := MyMedia{
@@ -285,6 +318,10 @@ func GetMetadataPhotos(folder string) []MyMedia {
 				golog.Err("Error: %+v", err)
 			}
 
+			if zone == "" || zone == "UTC" {
+				zone = "+00:00"
+			}
+
 			m := MyMedia{
 				FileName:  name,
 				Datetime:  dateVideo,
@@ -305,7 +342,7 @@ func GetMetadataPhotos(folder string) []MyMedia {
 		return nil
 	})
 	if err != nil {
-		log.Println(err)
+		golog.Err("Error: %+v", err)
 	}
 
 	return medias
