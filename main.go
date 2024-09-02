@@ -64,7 +64,7 @@ func main() {
 	golog.Notice("Welcome. Started application and analyse medias.")
 	golog.Notice("Wait a moment please ...")
 
-	medias := models.GetMetadataPhotos(folder)
+	medias := models.GetMetadataAll(folder)
 
 	models.ReadFileToSlice(&medias)
 

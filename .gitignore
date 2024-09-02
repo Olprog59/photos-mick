@@ -6,3 +6,7 @@ tmp
 .idea
 photos.json
 mick-photos
+.DS_Store
+.env
+.env*
+*.env**

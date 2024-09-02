@@ -11,6 +11,7 @@ require (
 	github.com/AlexEidt/Vidio v1.5.1 // indirect
 	github.com/Olprog59/golog v0.0.5 // indirect
 	github.com/cajax/yami v0.0.0-20200721163456-a06b3d04ca3b // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/philhofer/fwd v1.1.2 // indirect

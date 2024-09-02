@@ -23,8 +23,6 @@ func loadTemplates() (*template.Template, error) {
 		},
 	}
 
-	golog.Info("Chargement des templates intégrés")
-
 	// Charger les templates à partir des fichiers intégrés
 	templatesFS, err := fs.Sub(templateFS, "templates")
 	if err != nil {
